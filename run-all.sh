@@ -10,15 +10,17 @@
 # busybox-static. Everything runs in VMs and files under $TURBO: your system
 # is never touched.
 set -euo pipefail
+trap 'echo "run-all ABORTADO: fallo en linea $LINENO (revisa la salida de arriba)" >&2' ERR
 export TURBO="${TURBO:-$(pwd)/work}"
 ISO=${1:?usage: run-all.sh <omarchy-official.iso>}
 S=$(cd "$(dirname "$0")/scripts" && pwd)
 echo "== [1/6] extrayendo airootfs del ISO oficial"
 $S/00-extract-airootfs.sh "$ISO"
 echo "== [2/6] instalacion fuente con el instalador OFICIAL (esto es lo lento: es el baseline)"
-BENCH_ISO="$ISO" $S/01-source-install.sh
-SRC=$(ls -t /dev/shm/omarchy-bench/*/disk.qcow2 2>/dev/null | head -1)
-[ -n "$SRC" ] || SRC=$(ls -t $TURBO/omarchy-bench/*/disk.qcow2 2>/dev/null | head -1)
+BENCH_ISO="$ISO" BENCH_KEEP_DISK=1 $S/01-source-install.sh
+RUN_ID=$(tail -1 "$TURBO/runs.jsonl" | jq -r .run_id)
+SRC="/dev/shm/omarchy-bench/$RUN_ID/disk.qcow2"
+[ -s "$SRC" ] || { echo "FALLO: disco fuente no encontrado en $SRC" >&2; exit 1; }
 echo "== [3/6] imagen dorada desde esa instalacion: $SRC"
 $S/02-build-golden.sh "$SRC" "$TURBO/golden12disk.raw"
 echo "== [4/6] mini-instalador (UKI + initramfs desde el airootfs)"

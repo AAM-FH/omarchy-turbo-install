@@ -73,7 +73,7 @@ cleanup() {
     vm_running && kill -9 "$(cat "$PIDFILE")" 2>/dev/null
   fi
   [[ -n $EVENT_PID ]] && kill "$EVENT_PID" 2>/dev/null
-  rm -rf "$SHM_DIR"
+  [[ ${BENCH_KEEP_DISK:-0} == 1 ]] || rm -rf "$SHM_DIR"
   return $status
 }
 trap cleanup EXIT
