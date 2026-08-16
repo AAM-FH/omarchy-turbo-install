@@ -72,7 +72,7 @@ cleanup() {
     while vm_running && ((w < 10)); do sleep 1; ((w += 1)); done
     vm_running && kill -9 "$(cat "$PIDFILE")" 2>/dev/null
   fi
-  [[ -n $EVENT_PID ]] && kill "$EVENT_PID" 2>/dev/null
+  [[ -n $EVENT_PID ]] && kill "$EVENT_PID" 2>/dev/null || true
   [[ ${BENCH_KEEP_DISK:-0} == 1 ]] || rm -rf "$SHM_DIR"
   return $status
 }
