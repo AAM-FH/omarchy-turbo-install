@@ -23,11 +23,11 @@ log "source btrfs UUID = $SRC_UUID  root PARTUUID = $SRC_PARTUUID  ESP FAT = $SR
 mount -o ro /dev/nbd4p1 $W/srcesp
 mount -o ro,subvol=@factory /dev/nbd4p2 $W/srcroot
 
-rm -f $OUT; truncate -s 12G $OUT
+rm -f $OUT; truncate -s 8448M $OUT
 sgdisk -Z $OUT >/dev/null 2>&1 || true
 # p2 PARTUUID must equal the source's: the copied UKI boots via root=PARTUUID=
 # and the boot reference is baked into the UKI, not read from the partition.
-sgdisk -n 1:2048:+2G -t 1:EF00 -n 2:0:0 -t 2:8304 -u 2:$SRC_PARTUUID $OUT >/dev/null
+sgdisk -n 1:2048:+256M -t 1:EF00 -n 2:0:0 -t 2:8304 -u 2:$SRC_PARTUUID $OUT >/dev/null
 losetup -fP $OUT; LO=$(losetup -j $OUT|cut -d: -f1)
 log "golden disk $LO : $(sgdisk -p $OUT | grep -E '^\s+[12]' | tr -s ' ')"
 
@@ -35,7 +35,7 @@ log "golden disk $LO : $(sgdisk -p $OUT | grep -E '^\s+[12]' | tr -s ' ')"
 # else systemd blocks ~90s on the missing dev-disk-by-uuid device at boot.
 mkfs.fat -F32 -n OMARCHYESP -i "$SRC_ESP_UUID" ${LO}p1 >/dev/null
 mkfs.btrfs -q -f -L omarchy_root -U "$SRC_UUID" ${LO}p2      # force source UUID so UKI matches
-mount ${LO}p2 $W/dstroot
+mount -o compress-force=zstd:3 ${LO}p2 $W/dstroot
 # recreate the FULL subvol layout fstab expects: @, @home, @log, @pkg.
 # Missing ones fail their mounts at boot and stall systemd (measured).
 for sv in @ @home @log @pkg; do btrfs subvolume create $W/dstroot/$sv >/dev/null; done
@@ -83,6 +83,8 @@ grep -q "LABEL=omarchy_root" $FSTAB || { log "GOLDEN_FAIL fstab sin LABEL"; exit
 log "E5b: UKI+limine+fstab reescritos a root/mounts por LABEL"
 
 sync
+USEP=$(df --output=pcent $W/dstroot | tail -1 | tr -dc 0-9)
+[ "$USEP" -lt 95 ] || { log "GOLDEN_FAIL root al ${USEP}%: agranda la particion"; exit 1; }
 PKGS=$(ls $W/dstroot/@/var/lib/pacman/local 2>/dev/null | wc -l)
 DATA=$(du -sh --apparent-size $W/dstroot/@ 2>/dev/null | cut -f1)
 log "golden poblado: pkgs=$PKGS data=$DATA UKI=$(ls $W/dstesp/EFI/Linux/ 2>/dev/null)"

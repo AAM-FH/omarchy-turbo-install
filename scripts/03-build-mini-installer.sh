@@ -44,16 +44,25 @@ say "init alcanzado"
 # discos: vda = destino del usuario (30G), vdb = imagen dorada (12G, ro)
 n=0; while [ ! -b /dev/vda ] || [ ! -b /dev/vdb ]; do sleep 0.1; n=$((n+1)); [ $n -gt 100 ] && { say "FAIL discos ausentes"; reboot -f; }; done
 say "dd start"
-/usr/bin/dd if=/dev/vdb of=/dev/vda bs=64M iflag=direct oflag=direct conv=sparse 2>/dev/null || { say "FAIL dd"; reboot -f; }
+SZ=$(blockdev --getsize64 /dev/vdb)
+CH=$(( (SZ/4/67108864 + 1) * 67108864 ))
+pids=""
+for i in 0 1 2 3; do
+  /usr/bin/dd if=/dev/vdb of=/dev/vda bs=64M skip=$((i*CH)) seek=$((i*CH)) count=$CH     iflag=direct,skip_bytes,count_bytes oflag=direct,seek_bytes conv=sparse,notrunc 2>/dev/null &
+  pids="$pids $!"
+done
+for x in $pids; do wait $x || { say "FAIL dd-parallel"; reboot -f; }; done
 say "dd done"
 sgdisk -e /dev/vda >/dev/null 2>&1
 echo ", +" | sfdisk --no-reread -f -N 2 /dev/vda >/dev/null 2>&1
-blockdev --rereadpt /dev/vda 2>/dev/null; sleep 0.3
+blockdev --rereadpt /dev/vda 2>/dev/null
+n=0; while [ ! -b /dev/vda2 ] && [ $n -lt 60 ]; do sleep 0.05; n=$((n+1)); done
 say "particion crecida"
 # E5b: fresh identity per install. Boot survives because the UKI roots by LABEL.
 sgdisk -G /dev/vda >/dev/null 2>&1 || { say "FAIL sgdisk-G"; reboot -f; }
 btrfstune -m /dev/vda2 >/dev/null 2>&1 || btrfstune -f -u /dev/vda2 >/dev/null 2>&1 || { say "FAIL btrfstune"; reboot -f; }
-blockdev --rereadpt /dev/vda 2>/dev/null; sleep 0.3
+blockdev --rereadpt /dev/vda 2>/dev/null
+n=0; while [ ! -b /dev/vda2 ] && [ $n -lt 60 ]; do sleep 0.05; n=$((n+1)); done
 say "identidad regenerada"
 mount -t btrfs -o subvol=@ /dev/vda2 /mnt || { say "FAIL mount"; reboot -f; }
 btrfs filesystem resize max /mnt >/dev/null 2>&1 || say "WARN resize"
