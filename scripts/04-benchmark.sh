@@ -22,4 +22,13 @@ TOTAL=$(awk -v a=$T0 -v b=$T1 'BEGIN{printf "%.2f", b-a}')
 log "qemu vivio ${TOTAL}s. serial:"
 grep -a "MINI\[" $W/serial.log || { log "E8_FAIL sin markers"; tail -5 $W/serial.log; exit 1; }
 grep -aq "MINI_DONE" $W/serial.log || { log "E8_FAIL init no completo"; exit 1; }
+# E5b fail-loud: the install must NOT share identity with the golden image
+LT=$(losetup -fP --show $W/target.raw); LG=$(losetup -fP --show ${TURBO}/golden12disk.raw)
+sleep 0.5
+TU=$(blkid -s UUID -o value ${LT}p2 || true); GU=$(blkid -s UUID -o value ${LG}p2 || true)
+TP=$(blkid -s PARTUUID -o value ${LT}p2 || true); GP=$(blkid -s PARTUUID -o value ${LG}p2 || true)
+losetup -d $LT $LG
+[ -n "$TU" ] && [ "$TU" != "$GU" ] || { log "E8_FAIL identidad: btrfs UUID compartido con el golden ($TU)"; exit 1; }
+[ -n "$TP" ] && [ "$TP" != "$GP" ] || { log "E8_FAIL identidad: PARTUUID compartido con el golden ($TP)"; exit 1; }
+log "identidad unica verificada: UUID=$TU PARTUUID=$TP (distintos del golden)"
 log "E8_DONE total-power-on-a-reboot=${TOTAL}s (objetivo <15)"

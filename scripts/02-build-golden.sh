@@ -33,8 +33,8 @@ log "golden disk $LO : $(sgdisk -p $OUT | grep -E '^\s+[12]' | tr -s ' ')"
 
 # ESP FAT serial must match the source: fstab mounts /boot by UUID=<fat serial>,
 # else systemd blocks ~90s on the missing dev-disk-by-uuid device at boot.
-mkfs.fat -F32 -i "$SRC_ESP_UUID" ${LO}p1 >/dev/null
-mkfs.btrfs -q -f -U "$SRC_UUID" ${LO}p2      # force source UUID so UKI matches
+mkfs.fat -F32 -n OMARCHYESP -i "$SRC_ESP_UUID" ${LO}p1 >/dev/null
+mkfs.btrfs -q -f -L omarchy_root -U "$SRC_UUID" ${LO}p2      # force source UUID so UKI matches
 mount ${LO}p2 $W/dstroot
 # recreate the FULL subvol layout fstab expects: @, @home, @log, @pkg.
 # Missing ones fail their mounts at boot and stall systemd (measured).
@@ -48,6 +48,40 @@ btrfs subvolume snapshot -r $W/dstroot/@ $W/dstroot/@factory >/dev/null
 # ESP: straight copy (UKI + limine + bootloader)
 mount ${LO}p1 $W/dstesp
 (cd $W/srcesp && tar cf - .) | (cd $W/dstesp && tar xf -)
+# --- E5b: boot references by LABEL, so every install can regenerate its
+# PARTUUIDs and btrfs UUID without rebuilding the UKI. A label is a name,
+# not an identity: constant across installs by design (like "EFI" on ESPs).
+UKI=$W/dstesp/EFI/Linux/omarchy_linux.efi
+objcopy -O binary --only-section=.cmdline "$UKI" $W/cmdline.bin
+tr -d '\0' < $W/cmdline.bin > $W/cmdline.txt
+sed -E 's#root=(UUID|PARTUUID)=[^ ]+#root=LABEL=omarchy_root#; s# resume=[^ ]+##; s# resume_offset=[^ ]+##' $W/cmdline.txt > $W/cmdline.new
+grep -q "root=LABEL=omarchy_root" $W/cmdline.new || { log "GOLDEN_FAIL uki-cmdline sin root="; exit 1; }
+objcopy --update-section .cmdline=$W/cmdline.new "$UKI"
+sed -i -E 's#root=(UUID|PARTUUID)=[^ ]+#root=LABEL=omarchy_root#g; s# resume=[^ ]+##g; s# resume_offset=[^ ]+##g' $W/dstesp/limine.conf 2>/dev/null || true
+# limine also pins the UKI by BLAKE2B in the entry path (file.efi#<hash>);
+# after editing the UKI its hash changed, so update it or limine invalidates
+# the entry and waits forever in its menu (measured).
+NEWB2=$(b2sum "$UKI" | cut -d" " -f1)
+sed -i -E "s|(omarchy_linux\.efi#)[0-9a-f]{128}|\1${NEWB2}|" $W/dstesp/limine.conf
+grep -q "$NEWB2" $W/dstesp/limine.conf || { log "GOLDEN_FAIL uki-path-hash no actualizado"; exit 1; }
+# limine verifies an enrolled BLAKE2B of its config; re-enroll after editing
+# it or the bootloader halts silently in firmware (measured).
+B2=$(b2sum $W/dstesp/limine.conf | cut -d" " -f1)
+for EB in EFI/limine/limine_x64.efi EFI/BOOT/BOOTX64.EFI; do
+  [ -f $W/dstesp/$EB ] || continue
+  cp $W/dstesp/$EB $W/dstroot/@/tmp/limine-enroll.efi
+  chroot $W/dstroot/@ /usr/bin/limine enroll-config --reset --quiet /tmp/limine-enroll.efi >/dev/null 2>&1 || true
+  chroot $W/dstroot/@ /usr/bin/limine enroll-config --quiet /tmp/limine-enroll.efi "$B2" || { log "GOLDEN_FAIL limine-enroll $EB"; exit 1; }
+  cp $W/dstroot/@/tmp/limine-enroll.efi $W/dstesp/$EB
+done
+rm -f $W/dstroot/@/tmp/limine-enroll.efi
+log "E5b: BLAKE2B de limine.conf re-enrolado en limine_x64 y BOOTX64"
+FSTAB=$W/dstroot/@/etc/fstab
+sed -i -E "s#^UUID=${SRC_UUID}#LABEL=omarchy_root#" $FSTAB
+sed -i -E "s#^UUID=[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}([[:space:]]+/boot)#LABEL=OMARCHYESP\1#" $FSTAB
+grep -q "LABEL=omarchy_root" $FSTAB || { log "GOLDEN_FAIL fstab sin LABEL"; exit 1; }
+log "E5b: UKI+limine+fstab reescritos a root/mounts por LABEL"
+
 sync
 PKGS=$(ls $W/dstroot/@/var/lib/pacman/local 2>/dev/null | wc -l)
 DATA=$(du -sh --apparent-size $W/dstroot/@ 2>/dev/null | cut -f1)

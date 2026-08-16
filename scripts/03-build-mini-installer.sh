@@ -26,6 +26,7 @@ copy_tool sgdisk
 copy_tool dd
 copy_tool sfdisk
 copy_tool btrfs
+copy_tool btrfstune
 mkdir -p $W/ir/usr/lib64 $W/ir/lib64
 cp $AR/usr/lib/ld-linux-x86-64.so.2 $W/ir/usr/lib/ 2>/dev/null || true
 ln -sf ../usr/lib/ld-linux-x86-64.so.2 $W/ir/lib64/ld-linux-x86-64.so.2 2>/dev/null || true
@@ -49,6 +50,11 @@ sgdisk -e /dev/vda >/dev/null 2>&1
 echo ", +" | sfdisk --no-reread -f -N 2 /dev/vda >/dev/null 2>&1
 blockdev --rereadpt /dev/vda 2>/dev/null; sleep 0.3
 say "particion crecida"
+# E5b: fresh identity per install. Boot survives because the UKI roots by LABEL.
+sgdisk -G /dev/vda >/dev/null 2>&1 || { say "FAIL sgdisk-G"; reboot -f; }
+btrfstune -m /dev/vda2 >/dev/null 2>&1 || btrfstune -f -u /dev/vda2 >/dev/null 2>&1 || { say "FAIL btrfstune"; reboot -f; }
+blockdev --rereadpt /dev/vda 2>/dev/null; sleep 0.3
+say "identidad regenerada"
 mount -t btrfs -o subvol=@ /dev/vda2 /mnt || { say "FAIL mount"; reboot -f; }
 btrfs filesystem resize max /mnt >/dev/null 2>&1 || say "WARN resize"
 : > /mnt/etc/machine-id

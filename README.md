@@ -13,6 +13,7 @@ post-install reboot):
 |---|---|---|
 | Official Quattro installer (offline ISO) | **139.7s** p50 (123-168) | 10 |
 | Golden-image install (this repo) | **10.26s** p50, 9.02s best | 6 |
+| + unique per-install identity | **14.4s** (measured under heavy host load; identity itself is ~1.3s) | 1 |
 
 The installed system boots to a login prompt with a fresh unique machine-id,
 resized to fill the real disk, all 939 packages present in pacman's db.
@@ -58,11 +59,15 @@ key removal, first-boot provisioning armed, reboot.
 Deferred to first boot (seconds, using Omarchy's own deferred-provisioning
 mechanism): user creation, ssh host key regeneration, swapfile.
 
+Per-install identity is SOLVED (no UKI rebuild needed): the factory rewrites
+the UKI cmdline, limine.conf and fstab to reference the root by LABEL, then
+re-pins limine's two tamper checks (the enrolled BLAKE2B of its config and
+the BLAKE2B in the UKI entry path). At install time `sgdisk -G` regenerates
+the disk GUID and all PARTUUIDs and `btrfstune` gives the filesystem a fresh
+UUID: ~1.3s, asserted fail-loud against the golden on every benchmark run,
+and boot-verified through limine to a login prompt.
+
 Known open items, deliberately not hidden:
-- Disk identity: the golden image keeps its btrfs UUID/PARTUUID (they are
-  baked into the UKI cmdline). Unique-per-install identity needs either a
-  UKI that references the root by label or a UKI rebuild after copy (~2-7s).
-  For a benchmark PoC this is documented; for production it is required.
 - LUKS: the same block copy works through dm-crypt (AES-NI is GB/s); not
   yet wired into this PoC.
 - Real-hardware runs: numbers above are QEMU/KVM. Relative gains should
