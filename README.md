@@ -1,0 +1,89 @@
+# omarchy-turbo-install
+
+**Proof of concept: a full Omarchy Quattro install (939 packages) in ~10
+seconds, power-on to reboot, boot-verified.** Same bits, same result as the
+official installer: the work just happens once, at image-build time, instead
+of on every machine.
+
+Measured on the same bench, same VM, same clock (QEMU/KVM on a bare-metal
+Ryzen 9 5950X, disk in RAM, timed externally from power-on to the guest's own
+post-install reboot):
+
+| Path | power-on → reboot | N |
+|---|---|---|
+| Official Quattro installer (offline ISO) | **139.7s** p50 (123-168) | 10 |
+| Golden-image install (this repo) | **10.26s** p50, 9.02s best | 6 |
+
+The installed system boots to a login prompt with a fresh unique machine-id,
+resized to fill the real disk, all 939 packages present in pacman's db.
+
+## Why it works
+
+Profiling the official installer (per-phase, per-package, per-subprocess)
+shows the 85-second package phase is a serial, single-core pipeline: zstd
+decompression, file-by-file extraction, pacman db fsyncs, hooks: with **zero
+I/O pressure and no benefit from more cores** (measured: 4 vCPUs = 32 vCPUs).
+The install result is identical every time, so this PoC builds that final
+disk state once (**from the official ISO, on your machine**) and then
+installing becomes a sequential block copy plus a handful of fixups:
+the only workload modern hardware finishes in seconds.
+
+This is the same distribution model used by ChromeOS, SteamOS, Android
+factory images, Windows OEM (sysprep) and every cloud VM image: golden image,
+grow-to-fit, first-boot identity and provisioning.
+
+## Run it
+
+```sh
+# any Linux with KVM; everything happens inside VMs and $TURBO, your system
+# is never touched
+sudo apt install qemu-system-x86 ovmf squashfs-tools libguestfs-tools \
+                 gdisk dosfstools btrfs-progs cloud-guest-utils busybox-static
+curl -LO https://iso.omarchy.org/omarchy-4.0.0.iso
+sudo TURBO=$PWD/work ./run-all.sh omarchy-4.0.0.iso
+```
+
+Step 2 runs the official unattended installer once (~2.5 min on fast
+hardware): that is both your baseline number and the source of the golden
+image. Step 5 prints the golden-image number. Step 6 boots the result.
+
+## What the 10s does and does not include
+
+Executed at install time: block copy of the image, GPT relocation and
+partition grow to the real disk, btrfs resize, machine-id reset, ssh host
+key removal, first-boot provisioning armed, reboot.
+
+Deferred to first boot (seconds, using Omarchy's own deferred-provisioning
+mechanism): user creation, ssh host key regeneration, swapfile.
+
+Known open items, deliberately not hidden:
+- Disk identity: the golden image keeps its btrfs UUID/PARTUUID (they are
+  baked into the UKI cmdline). Unique-per-install identity needs either a
+  UKI that references the root by label or a UKI rebuild after copy (~2-7s).
+  For a benchmark PoC this is documented; for production it is required.
+- LUKS: the same block copy works through dm-crypt (AES-NI is GB/s); not
+  yet wired into this PoC.
+- Real-hardware runs: numbers above are QEMU/KVM. Relative gains should
+  survive; absolute numbers will differ.
+- Product integration: the image should ship inside the ISO (replacing the
+  offline package mirror, zstd-compressed, similar size) rather than as a
+  second disk. The configurator flow stays as-is: this replaces only what
+  happens after you hit install.
+
+## Layout
+
+- `run-all.sh`: the whole chain, one command.
+- `scripts/00-extract-airootfs.sh`: unpack the official airootfs.
+- `scripts/01-source-install.sh`: unattended official install in QEMU
+  (adapted from omarchy-iso's own integration test harness).
+- `scripts/02-build-golden.sh`: golden 12G disk image (ESP + btrfs with the
+  full subvolume layout, factory snapshot included) from that install.
+- `scripts/03-build-mini-installer.sh`: 25MB UKI (systemd stub + 7.8MB
+  initramfs with dd/sgdisk/sfdisk/btrfs taken from the airootfs; the Omarchy
+  kernel has virtio and btrfs built in).
+- `scripts/04-benchmark.sh`: power-on → reboot wall clock.
+- `scripts/05-boot-verify.sh`: boots the installed disk to `login:`.
+
+MIT, like Omarchy itself. Derived from and grateful to
+[basecamp/omarchy](https://github.com/basecamp/omarchy) and
+[omacom-io/omarchy-iso](https://github.com/omacom-io/omarchy-iso).
