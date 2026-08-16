@@ -35,13 +35,15 @@ grow-to-fit, first-boot identity and provisioning.
 ## Run it
 
 ```sh
-# any Linux with KVM; everything happens inside VMs and $TURBO, your system
-# is never touched
-sudo apt install qemu-system-x86 ovmf squashfs-tools libguestfs-tools \
-                 gdisk dosfstools btrfs-progs cloud-guest-utils busybox-static
-curl -LO https://iso.omarchy.org/omarchy-4.0.0.iso
-sudo TURBO=$PWD/work ./run-all.sh omarchy-4.0.0.iso
+# any Linux with KVM and ~24G of free RAM; everything happens inside VMs and
+# ./work, your system is never touched. Dependencies (apt or pacman) and the
+# official ISO are fetched automatically.
+git clone https://github.com/AAM-FH/omarchy-turbo-install
+cd omarchy-turbo-install
+sudo ./run-all.sh
 ```
+
+Already have the ISO? `sudo ./run-all.sh /path/to/omarchy-4.0.0.iso`.
 
 Step 2 runs the official unattended installer once (~2.5 min on fast
 hardware): that is both your baseline number and the source of the golden

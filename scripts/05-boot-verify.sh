@@ -5,7 +5,7 @@ TURBO="${TURBO:-$(pwd)/work}"
 TARGET=${1:-/dev/shm/e8/target.raw}
 W=/dev/shm/e8boot; rm -rf $W; mkdir -p $W
 log(){ printf '==> [%s] %s\n' "$(date +%H:%M:%S)" "$1"; }
-cp /usr/share/OVMF/OVMF_VARS_4M.fd $W/VARS.fd
+cp "${OVMF_VARS:-/usr/share/OVMF/OVMF_VARS_4M.fd}" $W/VARS.fd
 # bench-only: serial getty so success is observable as a real login prompt
 L=$(losetup -fP --show $TARGET); mkdir -p $W/m
 mount -o subvol=@ ${L}p2 $W/m
@@ -14,7 +14,7 @@ ln -sf /usr/lib/systemd/system/serial-getty@.service $W/m/etc/systemd/system/get
 umount $W/m; losetup -d $L
 : > $W/serial.log
 qemu-system-x86_64 -cpu host -enable-kvm -machine q35,accel=kvm -smp 4 -m 4096 \
-  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+  -drive if=pflash,format=raw,readonly=on,file="${OVMF_CODE:-/usr/share/OVMF/OVMF_CODE_4M.fd}" \
   -drive if=pflash,format=raw,file=$W/VARS.fd \
   -drive file=$TARGET,format=raw,if=none,id=d0 -device virtio-blk-pci,drive=d0 \
   -serial file:$W/serial.log -display none -pidfile $W/pid -daemonize -no-reboot
