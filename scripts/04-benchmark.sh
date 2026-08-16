@@ -10,7 +10,7 @@ rm -rf $W; mkdir -p $W
 cp "${OVMF_VARS:-/usr/share/OVMF/OVMF_VARS_4M.fd}" $W/VARS.fd
 truncate -s 30G $W/target.raw
 T0=$(date +%s.%N)
-timeout 180 qemu-system-x86_64 -cpu host -enable-kvm -machine q35,accel=kvm -smp 8 -m 8192 \
+timeout 180 qemu-system-x86_64 -cpu host -enable-kvm -machine q35,accel=kvm -smp 8 -m 2048 \
   -drive if=pflash,format=raw,readonly=on,file="${OVMF_CODE:-/usr/share/OVMF/OVMF_CODE_4M.fd}" \
   -drive if=pflash,format=raw,file=$W/VARS.fd \
   -drive file=$W/target.raw,format=raw,if=none,id=t -device virtio-blk-pci,drive=t \

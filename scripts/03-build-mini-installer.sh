@@ -53,17 +53,13 @@ for i in 0 1 2 3; do
 done
 for x in $pids; do wait $x || { say "FAIL dd-parallel"; reboot -f; }; done
 say "dd done"
-sgdisk -e /dev/vda >/dev/null 2>&1
-echo ", +" | sfdisk --no-reread -f -N 2 /dev/vda >/dev/null 2>&1
+# One sgdisk call: relocate backup GPT, grow p2 to disk end, regen disk GUID
+# and all PARTUUIDs (E5b identity). Boot survives: the UKI roots by LABEL.
+sgdisk -e -d 2 -n 2:0:0 -t 2:8304 -G /dev/vda >/dev/null 2>&1 || { say "FAIL sgdisk"; reboot -f; }
 blockdev --rereadpt /dev/vda 2>/dev/null
 n=0; while [ ! -b /dev/vda2 ] && [ $n -lt 60 ]; do sleep 0.05; n=$((n+1)); done
-say "particion crecida"
-# E5b: fresh identity per install. Boot survives because the UKI roots by LABEL.
-sgdisk -G /dev/vda >/dev/null 2>&1 || { say "FAIL sgdisk-G"; reboot -f; }
 btrfstune -m /dev/vda2 >/dev/null 2>&1 || btrfstune -f -u /dev/vda2 >/dev/null 2>&1 || { say "FAIL btrfstune"; reboot -f; }
-blockdev --rereadpt /dev/vda 2>/dev/null
-n=0; while [ ! -b /dev/vda2 ] && [ $n -lt 60 ]; do sleep 0.05; n=$((n+1)); done
-say "identidad regenerada"
+say "particion e identidad listas"
 mount -t btrfs -o subvol=@ /dev/vda2 /mnt || { say "FAIL mount"; reboot -f; }
 btrfs filesystem resize max /mnt >/dev/null 2>&1 || say "WARN resize"
 : > /mnt/etc/machine-id
