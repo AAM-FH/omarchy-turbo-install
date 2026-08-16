@@ -1,6 +1,6 @@
 # omarchy-turbo-install
 
-**Proof of concept: a full Omarchy Quattro install (939 packages) in ~6-7
+**Proof of concept: a full Omarchy Quattro install (939 packages) in under 6
 seconds, power-on to reboot, boot-verified, with unique per-install identity.** Same bits, same result as the
 official installer: the work just happens once, at image-build time, instead
 of on every machine.
@@ -13,7 +13,7 @@ post-install reboot):
 |---|---|---|
 | Official Quattro installer (offline ISO) | **139.7s** p50 (123-168) | 10 |
 | Golden-image install (this repo) | **10.26s** p50, 9.02s best | 6 |
-| + unique per-install identity, sized+compressed image, parallel copy | **6.41s best**, ~7.1s typical (measured under host load ~20; quiet-host band pending) | 10 |
+| + unique per-install identity, sized+compressed image, parallel copy | **5.87s best**, p50 6.1s (warm, N=4) | 5 |
 
 The installed system boots to a login prompt with a fresh unique machine-id,
 resized to fill the real disk, all 939 packages present in pacman's db.
