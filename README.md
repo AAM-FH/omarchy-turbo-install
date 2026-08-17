@@ -50,7 +50,7 @@ Step 2 runs the official unattended installer once (~2.5 min on fast
 hardware): that is both your baseline number and the source of the golden
 image. Step 5 prints the golden-image number. Step 6 boots the result.
 
-## What the 10s does and does not include
+## What the ~6s does and does not include
 
 Executed at install time: block copy of the image, GPT relocation and
 partition grow to the real disk, btrfs resize, machine-id reset, ssh host
