@@ -85,6 +85,22 @@ Known open items, deliberately not hidden:
   second disk. The configurator flow stays as-is: this replaces only what
   happens after you hit install.
 
+## The one-file product test
+
+`scripts/06-build-turbo-usb.sh` builds **omarchy-turbo-usb.img (4.0GB, smaller
+than the official 6.3GB ISO)**: a single flashable file carrying the
+mini-installer plus the golden image as four parallel zstd frames. Flash it,
+boot any UEFI PC from it, and it finds the internal disk (never the USB
+itself), streams the image through parallel decompression, regenerates
+identity and reboots into the installed system.
+
+VM-verified end to end: power-on to installed-and-rebooting in **17.7s**
+(copy 12.3s), and the resulting internal disk boots to login with a fresh
+machine-id. On real hardware the number is bounded by USB read speed:
+~4GB to read, so a 400MB/s stick adds ~10s and a USB-NVMe enclosure adds ~2s.
+WARNING: it wipes the largest non-USB disk it finds, by design: speedrun
+semantics, not a polite installer.
+
 ## Layout
 
 - `run-all.sh`: the whole chain, one command.
@@ -98,6 +114,7 @@ Known open items, deliberately not hidden:
   kernel has virtio and btrfs built in).
 - `scripts/04-benchmark.sh`: power-on → reboot wall clock.
 - `scripts/05-boot-verify.sh`: boots the installed disk to `login:`.
+- `scripts/06-build-turbo-usb.sh`: the one-file flashable product image.
 
 MIT, like Omarchy itself. Derived from and grateful to
 [basecamp/omarchy](https://github.com/basecamp/omarchy) and
