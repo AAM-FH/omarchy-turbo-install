@@ -13,7 +13,7 @@ post-install reboot):
 |---|---|---|
 | Official Quattro installer (offline ISO) | **139.7s** p50 (123-168) | 10 |
 | Golden-image install (this repo) | **10.26s** p50, 9.02s best | 6 |
-| + unique per-install identity, sized+compressed image, parallel copy | **5.87s best**, p50 6.1s (warm, N=4) | 5 |
+| + unique per-install identity, sized+compressed image, parallel copy | **5.61s best, p50 5.80s** (warm, idle host) | 10 |
 
 The installed system boots to a login prompt with a fresh unique machine-id,
 resized to fill the real disk, all 939 packages present in pacman's db.
