@@ -1,9 +1,14 @@
 # omarchy-turbo-install
 
 **Proof of concept: a full Omarchy Quattro install (939 packages) in under 6
-seconds, power-on to reboot, boot-verified, with unique per-install identity.** Same bits, same result as the
-official installer: the work just happens once, at image-build time, instead
-of on every machine.
+seconds, power-on to reboot, boot-verified, with unique per-install identity:
+from a 4.0GB one-file image, 37% smaller than the official 6.3GB ISO.**
+Same bits, same result as the official installer: the work just happens once,
+at image-build time, instead of on every machine. Smaller download AND faster
+install from the same structural change: shipping the installed system beats
+shipping the ingredients (the official ISO carries a full live environment
+plus an uncompressed package mirror; this carries a 25MB installer plus the
+compressed final system).
 
 Measured on the same bench, same VM, same clock (QEMU/KVM on a bare-metal
 Ryzen 9 5950X, disk in RAM, timed externally from power-on to the guest's own
